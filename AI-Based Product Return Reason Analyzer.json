@@ -1,0 +1,677 @@
+{
+  "name": "AI-Based Product Return Reason Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "product-return",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c9292499-fa24-44f7-b186-a5947d9dea76",
+      "name": "Webhook - Receive Return Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -992,
+        144
+      ],
+      "webhookId": "product-return-webhook"
+    },
+    {
+      "parameters": {},
+      "id": "32d6bb29-8cec-4c7e-97e8-10a66cacad4e",
+      "name": "OpenAI - Analyze Return Reason",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1152,
+        -32
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook - Receive Return Data').first().json.body;\n\n// ✅ GROQ response path (was message.content before — that was OpenAI format)\nconst aiResponse = $input.first().json.choices[0].message.content;\n\nlet parsed;\ntry {\n  const cleaned = aiResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch(e) {\n  parsed = {\n    category: 'Other',\n    sentiment: 'Neutral',\n    severity: 1,\n    summary: 'Unable to parse AI response.'\n  };\n}\n\nconst timestamp = new Date().toISOString();\n\nreturn {\n  order_id: body.order_id || '',\n  customer_name: body.customer_name || '',\n  email: body.email || '',\n  product_name: body.product_name || '',\n  category: parsed.category || 'Other',\n  sentiment: parsed.sentiment || 'Neutral',\n  severity: parseInt(parsed.severity) || 1,\n  summary: parsed.summary || '',\n  timestamp: timestamp\n};"
+      },
+      "id": "d3343f56-5703-46fe-b1ae-f56599346f01",
+      "name": "Code - Structure Final Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "severity-check",
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8dc6789e-3d21-4272-a7b4-4074132ed99c",
+      "name": "IF - Severity >= 4",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "return_db",
+          "mode": "list",
+          "cachedResultName": "return_db"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": 0,
+            "severity": 0
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_name",
+              "displayName": "product_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentiment",
+              "displayName": "sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "07d58425-a07c-4875-b800-676cc7c55655",
+      "name": "Postgres - Insert Record (High Severity)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "product_return_insights",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $json.order_id }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "email": "={{ $json.email }}",
+            "product_name": "={{ $json.product_name }}",
+            "category": "={{ $json.category }}",
+            "sentiment": "={{ $json.sentiment }}",
+            "severity": "={{ $json.severity }}",
+            "summary": "={{ $json.summary }}",
+            "timestamp": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "5198ef50-b1ef-458e-8dd9-53cd1ead8d78",
+      "name": "Postgres - Insert Record (Normal Severity)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -32,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, order_id: $('Code - Structure Final Output').first().json.order_id, category: $('Code - Structure Final Output').first().json.category, sentiment: $('Code - Structure Final Output').first().json.sentiment, severity: $('Code - Structure Final Output').first().json.severity, summary: $('Code - Structure Final Output').first().json.summary, timestamp: $('Code - Structure Final Output').first().json.timestamp }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "306183d1-d6ec-46c9-ae6c-828ef071e13a",
+      "name": "Webhook Response - High Severity",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, order_id: $('Code - Structure Final Output').first().json.order_id, category: $('Code - Structure Final Output').first().json.category, sentiment: $('Code - Structure Final Output').first().json.sentiment, severity: $('Code - Structure Final Output').first().json.severity, summary: $('Code - Structure Final Output').first().json.summary, timestamp: $('Code - Structure Final Output').first().json.timestamp }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "919ae676-32bc-4803-a217-d99996cf2d6e",
+      "name": "Webhook Response - Normal Severity",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "1602c114-883a-43a2-8240-84e73169afbf",
+      "name": "Cron - Daily 9AM Report",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) AS total_returns,\n  MODE() WITHIN GROUP (ORDER BY category) AS most_common_category,\n  AVG(severity) AS avg_severity,\n  MAX(severity) AS max_severity\nFROM product_return_insights\nWHERE timestamp >= NOW() - INTERVAL '24 hours';",
+        "options": {}
+      },
+      "id": "c0982839-e5da-4554-8d8d-3ee707f6842d",
+      "name": "Postgres - Aggregate Daily Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -720,
+        528
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  product_name,\n  COUNT(*) AS return_count,\n  AVG(severity) AS avg_severity,\n  MAX(severity) AS max_severity,\n  MODE() WITHIN GROUP (ORDER BY category) AS top_category\nFROM product_return_insights\nWHERE timestamp >= NOW() - INTERVAL '24 hours'\nGROUP BY product_name\nORDER BY avg_severity DESC, return_count DESC\nLIMIT 10;",
+        "options": {}
+      },
+      "id": "648c1d15-b9f5-4ae3-897a-9d4f03ae2cfd",
+      "name": "Postgres - Top Products by Severity",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -480,
+        528
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stats = $('Postgres - Aggregate Daily Stats').first().json;\nconst topProducts = $('Postgres - Top Products by Severity').all().map(item => item.json);\n\nconst reportDate = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\nlet productsTableRows = '';\nif (topProducts.length === 0) {\n  productsTableRows = '<tr><td colspan=\"5\" style=\"text-align:center; padding: 12px; color: #6c757d;\">No returns recorded in the last 24 hours</td></tr>';\n} else {\n  topProducts.forEach(p => {\n    const severityColor = p.max_severity >= 4 ? '#dc3545' : p.max_severity >= 3 ? '#fd7e14' : '#28a745';\n    productsTableRows += `<tr>\n      <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6;\">${p.product_name}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6; text-align:center;\">${p.return_count}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6; text-align:center;\">${parseFloat(p.avg_severity).toFixed(1)}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6; text-align:center; color: ${severityColor}; font-weight:bold;\">${p.max_severity}</td>\n      <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6;\">${p.top_category}</td>\n    </tr>`;\n  });\n}\n\nconst htmlReport = `<html><body style=\"font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;\">\n<div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;\">\n  <h1 style=\"margin: 0; font-size: 24px;\">📊 Daily Return Analytics Report</h1>\n  <p style=\"margin: 8px 0 0 0; opacity: 0.9;\">${reportDate}</p>\n</div>\n<div style=\"background: #f8f9fa; padding: 25px; border: 1px solid #dee2e6;\">\n  <h2 style=\"color: #495057; margin-top: 0;\">📈 24-Hour Summary</h2>\n  <div style=\"display: flex; gap: 15px; flex-wrap: wrap;\">\n    <div style=\"background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; flex: 1; min-width: 140px; text-align: center;\">\n      <div style=\"font-size: 36px; font-weight: bold; color: #667eea;\">${stats.total_returns || 0}</div>\n      <div style=\"color: #6c757d; font-size: 14px; margin-top: 5px;\">Total Returns</div>\n    </div>\n    <div style=\"background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; flex: 1; min-width: 140px; text-align: center;\">\n      <div style=\"font-size: 24px; font-weight: bold; color: #fd7e14;\">${stats.most_common_category || 'N/A'}</div>\n      <div style=\"color: #6c757d; font-size: 14px; margin-top: 5px;\">Top Category</div>\n    </div>\n    <div style=\"background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; flex: 1; min-width: 140px; text-align: center;\">\n      <div style=\"font-size: 36px; font-weight: bold; color: #28a745;\">${stats.avg_severity ? parseFloat(stats.avg_severity).toFixed(1) : '0.0'}</div>\n      <div style=\"color: #6c757d; font-size: 14px; margin-top: 5px;\">Avg Severity</div>\n    </div>\n    <div style=\"background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; flex: 1; min-width: 140px; text-align: center;\">\n      <div style=\"font-size: 36px; font-weight: bold; color: #dc3545;\">${stats.max_severity || 0}</div>\n      <div style=\"color: #6c757d; font-size: 14px; margin-top: 5px;\">Max Severity</div>\n    </div>\n  </div>\n</div>\n<div style=\"background: white; padding: 25px; border: 1px solid #dee2e6;\">\n  <h2 style=\"color: #495057; margin-top: 0;\">🏆 Products with Highest Return Severity</h2>\n  <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n    <thead>\n      <tr style=\"background: #667eea; color: white;\">\n        <th style=\"padding: 12px; text-align: left;\">Product Name</th>\n        <th style=\"padding: 12px; text-align: center;\">Returns</th>\n        <th style=\"padding: 12px; text-align: center;\">Avg Severity</th>\n        <th style=\"padding: 12px; text-align: center;\">Max Severity</th>\n        <th style=\"padding: 12px; text-align: left;\">Top Category</th>\n      </tr>\n    </thead>\n    <tbody>\n      ${productsTableRows}\n    </tbody>\n  </table>\n</div>\n<div style=\"background: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; border-radius: 0 0 8px 8px;\">\n  <p style=\"color: #6c757d; font-size: 12px; text-align: center; margin: 0;\">Generated automatically by Product Return Analyzer | ${new Date().toISOString()}</p>\n</div>\n</body></html>`;\n\nreturn {\n  subject: `Daily Return Analytics Report - ${reportDate} | ${stats.total_returns || 0} Returns`,\n  htmlReport,\n  reportDate,\n  stats\n};"
+      },
+      "id": "0d6c891e-2429-428e-9cac-e2f01c0aa033",
+      "name": "Code - Build Daily Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "process.env.GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 300,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a product return analyzer. Reply ONLY with a JSON object, no extra text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this return:\\nProduct: {{ $('Webhook - Receive Return Data').first().json.body.product_name }}\\nReason: {{ $('Webhook - Receive Return Data').first().json.body.return_reason_text }}\\n\\nReturn ONLY this JSON:\\n{\\\"category\\\": \\\"Size Issue or Damaged Item or Wrong Product or Quality Issue or Late Delivery or Other\\\", \\\"sentiment\\\": \\\"Positive or Neutral or Negative\\\", \\\"severity\\\": 1to5, \\\"summary\\\": \\\"one sentence\\\"}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -752,
+        128
+      ],
+      "id": "ec742c1c-8651-4e22-ad34-45632ce6ef0e",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "sendTo": "=ashibaalben7744@gmail.com",
+        "subject": "=🚨 HIGH SEVERITY Return Alert - Order {{ $json.order_id }}",
+        "message": "=<html>\n<body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n\n  <div style=\"background-color: #dc3545; color: white; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"margin:0;\">🚨 High Severity Product Return Alert</h2>\n  </div>\n\n  <div style=\"padding: 20px; border: 1px solid #dee2e6;\">\n    <p><strong>Order ID:</strong> {{ $json.order_id }}</p>\n    <p><strong>Customer:</strong> {{ $json.customer_name }}</p>\n    <p><strong>Email:</strong> {{ $json.email }}</p>\n    <p><strong>Product:</strong> {{ $json.product_name }}</p>\n    <p><strong>Category:</strong> {{ $json.category }}</p>\n    <p><strong>Sentiment:</strong> {{ $json.sentiment }}</p>\n    <p><strong>Severity:</strong> <span style=\"color:#dc3545; font-weight:bold;\">{{ $json.severity }} / 5</span></p>\n    <p><strong>Timestamp:</strong> {{ $json.timestamp }}</p>\n    <div style=\"background:#fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 15px; border-radius: 4px;\">\n      <strong>🔍 AI Insight:</strong><br/>\n      {{ $json.summary }}\n    </div>\n  </div>\n\n  <div style=\"background:#f8f9fa; padding: 12px; text-align:center; font-size:12px; color:#6c757d;\">\n    Automated alert from Product Return Analyzer\n  </div>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -32,
+        32
+      ],
+      "id": "78e0ba54-df20-49db-ba7b-cfc878fa979f",
+      "name": "Send a message",
+      "webhookId": "e792f2cc-8966-4f12-ada3-7215ec681b9c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dQcBkAqM2418mY3p",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.ALERT_TO_EMAIL }}",
+        "subject": "=🚨 HIGH SEVERITY Return Alert - Order {{ $json.order_id }}",
+        "message": "hello",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -32,
+        528
+      ],
+      "id": "92893087-0e93-4576-a1e2-ba69363464f6",
+      "name": "Send a message1",
+      "webhookId": "e792f2cc-8966-4f12-ada3-7215ec681b9c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dQcBkAqM2418mY3p",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "product_return_insights",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $json.order_id }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "email": "={{ $json.email }}",
+            "product_name": "={{ $json.product_name }}",
+            "category": "={{ $json.category }}",
+            "sentiment": "={{ $json.sentiment }}",
+            "severity": "={{ $json.severity }}",
+            "summary": "={{ $json.summary }}",
+            "timestamp": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "421dfbf2-a925-4bb9-b2d7-e1c963e6df64",
+      "name": "Postgres - Insert Record (Normal Severity)1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -608,
+        -112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE return_db(\n    id SERIAL PRIMARY KEY,\n    order_id TEXT,\n    customer_name TEXT,\n    email TEXT,\n    product_name TEXT,\n    category TEXT,\n    sentiment TEXT,\n    severity INT,\n    summary TEXT,\n    timestamp TIMESTAMP\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -272,
+        -112
+      ],
+      "id": "6887032d-0243-419b-bed5-a1ecad42b1ba",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "ejOSzz7gjk9Nbhpi",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code - Structure Final Output": {
+      "main": [
+        [
+          {
+            "node": "IF - Severity >= 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Severity >= 4": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Postgres - Insert Record (Normal Severity)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Insert Record (High Severity)": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response - High Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Insert Record (Normal Severity)": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response - Normal Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron - Daily 9AM Report": {
+      "main": [
+        [
+          {
+            "node": "Postgres - Aggregate Daily Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Aggregate Daily Stats": {
+      "main": [
+        [
+          {
+            "node": "Postgres - Top Products by Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Top Products by Severity": {
+      "main": [
+        [
+          {
+            "node": "Code - Build Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build Daily Report": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receive Return Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code - Structure Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Postgres - Insert Record (High Severity)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Insert Record (Normal Severity)1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ac72b322-7c80-4173-864e-515dbe46ca59",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b58b90efe3ea012658fb3a711cdcdeef4f79efda6da6d5d7e02dfb12864d4d46"
+  },
+  "id": "tJ425f75ouU4uuhy",
+  "tags": []
+}
